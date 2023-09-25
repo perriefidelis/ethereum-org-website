@@ -20,9 +20,9 @@ Optimistic rollup operators bundle multiple off-chain transactions together in l
 
 Optimistic rollups are considered “optimistic” because they assume off-chain transactions are valid and don't publish proofs of validity for transaction batches posted on-chain. This separates optimistic rollups from [zero-knowledge rollups](/developers/docs/scaling/zk-rollups) that publish cryptographic [proofs of validity](/glossary/#validity-proof) for off-chain transactions.
 
-Optimistic rollups instead rely on a fraud-proving scheme to detect cases where transactions are not calculated correctly. After a rollup batch is submitted on Ethereum, there's a time window (called a challenge period) during which anyone can challenge the results of a rollup transaction by computing a [fraud proof](/glossary/#fraud-proof).
+Optimistic rollups instead rely on a fraud-proving scheme to detect cases where transactions are not calculated correctly. After a rollup batch is submitted on Ethereum, there's a time window (called a challenge period) during which anyone can challenge the results of a rollup transaction by computing a [fault proof](/glossary/#fraud-proof).
 
-If the fraud proof succeeds, the rollup protocol re-executes the transaction(s) and updates the rollup's state accordingly. The other effect of a successful fraud proof is that the sequencer responsible for including the incorrectly executed transaction in a block receives a penalty.
+If the fault proof succeeds, the rollup protocol re-executes the transaction(s) and updates the rollup's state accordingly. The other effect of a successful fault proof is that the sequencer responsible for including the incorrectly executed transaction in a block receives a penalty.
 
 If the rollup batch remains unchallenged (i.e., all transactions are correctly executed) after the challenge period elapses, it is deemed valid and accepted on Ethereum. Others can continue to build on an unconfirmed rollup block, but with a caveat: transaction results will be reversed if based on an incorrectly executed transaction published previously.
 
@@ -36,7 +36,7 @@ The architecture of an optimistic rollup comprises the following parts:
 
 **Off-chain virtual machine (VM)**: Although contracts managing the optimistic rollup protocol run on Ethereum, the rollup protocol performs computation and state storage on another virtual machine separate from the [Ethereum Virtual Machine](/developers/docs/evm/). The off-chain VM is where applications live and state changes are executed; it serves as the upper layer or "layer 2" for an optimistic rollup.
 
-As optimistic rollups are designed to run programs either written or compiled for the EVM, the off-chain VM incorporates many EVM design specs. Additionally, fraud proofs computed on-chain allows the Ethereum network to enforce the validity of state changes computed in the off-chain VM.
+As optimistic rollups are designed to run programs either written or compiled for the EVM, the off-chain VM incorporates many EVM design specs. Additionally, fault proofs computed on-chain allows the Ethereum network to enforce the validity of state changes computed in the off-chain VM.
 
 Optimistic rollups are described as 'hybrid scaling solutions' because, while they exist as separate protocols, their security properties are derived from Ethereum. Among other things, Ethereum guarantees the correctness of a rollup’s off-chain computation and the availability of data behind the computation. This makes optimistic rollups more secure than pure off-chain scaling protocols (e.g., [sidechains](/developers/docs/scaling/sidechains/)) that do not rely on Ethereum for security.
 
@@ -46,7 +46,7 @@ Optimistic rollups rely on the main Ethereum protocol for the following:
 
 As mentioned, optimistic rollups post transaction data to Ethereum as `calldata`. Since the rollup chain's execution is based on submitted transactions, anyone can use this information—anchored on Ethereum’s base layer—to execute the rollup’s state and verify the correctness of state transitions.
 
-[Data availability](/developers/docs/data-availability/) is critical because without access to state data, challengers cannot construct fraud proofs to dispute invalid rollup operations. With Ethereum providing data availability, the risk of rollup operators getting away with malicious acts (e.g., submitting invalid blocks) is reduced.
+[Data availability](/developers/docs/data-availability/) is critical because without access to state data, challengers cannot construct fault proofs to dispute invalid rollup operations. With Ethereum providing data availability, the risk of rollup operators getting away with malicious acts (e.g., submitting invalid blocks) is reduced.
 
 ### Censorship resistance {#censorship-resistance}
 
@@ -68,7 +68,7 @@ Optimistic rollups solve this problem by forcing operators to publish data assoc
 
 Another role Ethereum plays in the context of optimistic rollups is that of a settlement layer. A settlement layer anchors the entire blockchain ecosystem, establishes security, and provides objective finality if a dispute occurs on another chain (optimistic rollups in this case) that requires arbitration.
 
-Ethereum Mainnet provides a hub for optimistic rollups to verify fraud proofs and resolve disputes. Moreover, transactions conducted on the rollup are only final _after_ the rollup block is accepted on Ethereum. Once a rollup transaction is committed to Ethereum’s base layer, it cannot be rolled back (except in the highly unlikely case of a chain reorganization).
+Ethereum Mainnet provides a hub for optimistic rollups to verify fault proofs and resolve disputes. Moreover, transactions conducted on the rollup are only final _after_ the rollup block is accepted on Ethereum. Once a rollup transaction is committed to Ethereum’s base layer, it cannot be rolled back (except in the highly unlikely case of a chain reorganization).
 
 ## How do optimistic rollups work? {#how-optimistic-rollups-work}
 
@@ -78,7 +78,7 @@ Users submit transactions to “operators”, which are nodes responsible for pr
 
 Although anyone can become a validator, optimistic rollup validators must provide a bond before producing blocks, much like a [proof-of-stake system](/developers/docs/consensus-mechanisms/pos/). This bond can be slashed if the validator posts an invalid block or builds on an old-but-invalid block (even if their block is valid). This way optimistic rollups utilize cryptoeconomic incentives to ensure validators act honestly.
 
-Other validators on the optimistic rollup chain are expected to execute the submitted transactions using their copy of the rollup’s state. If a validator’s final state is different from the operator’s proposed state, they can start a challenge and compute a fraud proof.
+Other validators on the optimistic rollup chain are expected to execute the submitted transactions using their copy of the rollup’s state. If a validator’s final state is different from the operator’s proposed state, they can start a challenge and compute a fault proof.
 
 Some optimistic rollups may forgo a permissionless validator system and use a single “sequencer” to execute the chain. Like a validator, the sequencer processes transactions, produces rollup blocks, and submits rollup transactions to the L1 chain (Ethereum).
 
@@ -106,15 +106,15 @@ The rollup operator is also required to commit a Merkle root for the transaction
 
 State commitments, especially state roots, are necessary for proving the correctness of state changes in an optimistic rollup. The rollup contract accepts new state roots from operators immediately after they are posted, but can later delete invalid state roots to restore the rollup to its correct state.
 
-### Fraud proving {#fraud-proving}
+### fault proving {#fault-proving}
 
 As explained, optimistic rollups allow anyone to publish blocks without providing proofs of validity. However, to ensure the chain remains safe, optimistic rollups specify a time window during which anyone can dispute a state transition. Hence, rollup blocks are called “assertions” since anyone can dispute their validity.
 
-If someone disputes an assertion, then the rollup protocol will initiate the fraud proof computation. Every type of fraud proof is interactive—someone must post an assertion before another person can challenge it. The difference lies in how many rounds of interaction are required to compute the fraud proof.
+If someone disputes an assertion, then the rollup protocol will initiate the fault proof computation. Every type of fault proof is interactive—someone must post an assertion before another person can challenge it. The difference lies in how many rounds of interaction are required to compute the fault proof.
 
 Single-round interactive proving schemes replay disputed transactions on L1 to detect invalid assertions. The rollup protocol emulates the re-execution of the disputed transaction on L1 (Ethereum) using a verifier contract, with the computed state root determining who wins the challenge. If the challenger's claim about the rollup’s correct state is correct, the operator is penalized by having their bond slashed.
 
-However, re-executing transactions on L1 to detect fraud requires publishing state commitments for individual transactions and increases the data rollups must publish on-chain. Replaying transactions also incurs significant gas costs. For these reasons, optimistic rollups are switching to multi-round interactive proving, which achieves the same objective (i.e., detecting invalid rollup operations) with more efficiency.
+However, re-executing transactions on L1 to detect fault requires publishing state commitments for individual transactions and increases the data rollups must publish on-chain. Replaying transactions also incurs significant gas costs. For these reasons, optimistic rollups are switching to multi-round interactive proving, which achieves the same objective (i.e., detecting invalid rollup operations) with more efficiency.
 
 #### Multi-round interactive proving {#multi-round-interactive-proving}
 
@@ -124,9 +124,9 @@ The challenger will then choose what assertion it wants to challenge. The dividi
 
 The asserter is required to provide a “one-step proof” verifying the validity of the disputed single-step computation. If the asserter fails to provide the one-step proof, or the L1 verifier deems the proof invalid, they lose the challenge.
 
-Some notes about this type of fraud proof:
+Some notes about this type of fault proof:
 
-1. Multi-round interactive fraud proving is considered efficient because it minimizes the work the L1 chain must do in dispute arbitration. Instead of replaying the entire transaction, the L1 chain only needs to re-execute one step in the rollup's execution.
+1. Multi-round interactive fault proving is considered efficient because it minimizes the work the L1 chain must do in dispute arbitration. Instead of replaying the entire transaction, the L1 chain only needs to re-execute one step in the rollup's execution.
 
 2. Bisection protocols reduce the amount of data posted on-chain (no need to publish state commits for every transaction). Also, optimistic rollup transactions are not constrained by Ethereum's gas limit. Conversely, optimistic rollups re-executing transactions must make sure an L2 transaction has a lower gas limit to emulate its execution within a single Ethereum transaction.
 
@@ -134,13 +134,13 @@ Some notes about this type of fraud proof:
 
 4. Multi-round interactive proving requires both parties (the asserter and the challenger) to make moves within the specified time window. Failure to act before the deadline expires causes the defaulting party to forfeit the challenge.
 
-#### Why fraud proofs matter for optimistic rollups {#fraud-proof-benefits}
+#### Why fault proofs matter for optimistic rollups {#fraud-proof-benefits}
 
-Fraud proofs are important because they facilitate _trustless finality_ in optimistic rollups. Trustless finality is a quality of optimistic rollups that guarantees that a transaction—so long as it’s valid—will eventually be confirmed.
+fault proofs are important because they facilitate _trustless finality_ in optimistic rollups. Trustless finality is a quality of optimistic rollups that guarantees that a transaction—so long as it’s valid—will eventually be confirmed.
 
-Malicious nodes can try to delay the confirmation of a valid rollup block by starting false challenges. However, fraud proofs will eventually prove the rollup block’s validity and cause it to be confirmed.
+Malicious nodes can try to delay the confirmation of a valid rollup block by starting false challenges. However, fault proofs will eventually prove the rollup block’s validity and cause it to be confirmed.
 
-This also relates to another security property of optimistic rollups: the validity of the chain relies on the existence of _one_ honest node. The honest node can advance the chain correctly by either posting valid assertions or disputing invalid assertions. Whatever the case, malicious nodes who enter into disputes with the honest node will lose their stakes during the fraud proving process.
+This also relates to another security property of optimistic rollups: the validity of the chain relies on the existence of _one_ honest node. The honest node can advance the chain correctly by either posting valid assertions or disputing invalid assertions. Whatever the case, malicious nodes who enter into disputes with the honest node will lose their stakes during the fault proving process.
 
 ### L1/L2 interoperability {#l1-l2-interoperability}
 
@@ -158,7 +158,7 @@ Some optimistic rollups adopt a more straightforward approach to prevent sequenc
 
 ##### Exiting the rollup
 
-Withdrawing from an optimistic rollup to Ethereum is more difficult owing to the fraud proving scheme. If a user initiates an L2 > L1 transaction to withdraw funds escrowed on L1, they must wait until the challenge period—lasting roughly seven days—elapses. Nevertheless, the withdrawal process itself is fairly straightforward.
+Withdrawing from an optimistic rollup to Ethereum is more difficult owing to the fault proving scheme. If a user initiates an L2 > L1 transaction to withdraw funds escrowed on L1, they must wait until the challenge period—lasting roughly seven days—elapses. Nevertheless, the withdrawal process itself is fairly straightforward.
 
 After the withdrawal request is initiated on the L2 rollup, the transaction is included in the next batch, while the user’s assets on the rollup are burned. Once the batch is published on Ethereum, the user can compute a Merkle proof verifying the inclusion of their exit transaction in the block. Then it is a matter of waiting through the delay period to finalize the transaction on L1 and withdraw funds to Mainnet.
 
@@ -235,10 +235,10 @@ The introduction of [data sharding](/roadmap/danksharding/) on Ethereum is expec
 
 | Pros                                                                                                                                                  | Cons                                                                                                                                                |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Offers massive improvements in scalability without sacrificing security or trustlessness.                                                             | Delays in transaction finality due to potential fraud challenges.                                                                                   |
+| Offers massive improvements in scalability without sacrificing security or trustlessness.                                                             | Delays in transaction finality due to potential fault challenges.                                                                                   |
 | Transaction data is stored on the layer 1 chain, improving transparency, security, censorship-resistance, and decentralization.                       | Centralized rollup operators (sequencers) can influence transaction ordering.                                                                       |
-| Fraud proving guarantees trustless finality and allows honest minorities to secure the chain.                                                         | If there are no honest nodes a malicious operator can steal funds by posting invalid blocks and state commitments.                                  |
-| Computing fraud proofs is open to regular L2 node, unlike validity proofs (used in ZK-rollups) that require special hardware.                         | Security model relies on at least one honest node executing rollup transactions and submitting fraud proofs to challenge invalid state transitions. |
+| fault proving guarantees trustless finality and allows honest minorities to secure the chain.                                                         | If there are no honest nodes a malicious operator can steal funds by posting invalid blocks and state commitments.                                  |
+| Computing fault proofs is open to regular L2 node, unlike validity proofs (used in ZK-rollups) that require special hardware.                         | Security model relies on at least one honest node executing rollup transactions and submitting fault proofs to challenge invalid state transitions. |
 | Rollups benefit from "trustless liveness" (anyone can force the chain to advance by executing transactions and posting assertions)                    | Users must wait for the one-week challenge period to expire before withdrawing funds back to Ethereum.                                              |
 | Optimistic rollups rely on well-designed cryptoeconomic incentives to increase security on the chain.                                                 | Rollups must post all transaction data on-chain, which can increase costs.                                                                          |
 | Compatibility with EVM and Solidity allows developers to port Ethereum-native smart contracts to rollups or use existing tooling to create new dapps. |
